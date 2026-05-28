@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+gh repo create my-repo --public --source=. --remote=origin --push
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>German Flashcards</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <header>
+    <span class="logo">🇩🇪</span>
+    <h1>German <span>Flashcards</span></h1>
+    <div class="header-stats">
+      <span class="stat learnt-stat"><span id="learnt-count">0</span> learnt</span>
+      <span class="stat-divider">/</span>
+      <span class="stat total-stat"><span id="total-count">0</span> total</span>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Progress -->
+    <div class="progress-wrap">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Card -->
+    <div class="card-scene" id="card-scene">
+      <div class="card" id="card">
+        <div class="card-face card-front" id="card-front">
+          <span class="card-label">Loading…</span>
+        </div>
+        <div class="card-face card-back" id="card-back">
+          <span class="card-label">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Answer buttons — hidden until card is flipped -->
+    <div class="answer-btns hidden" id="answer-btns">
+      <button class="answer-btn wrong-btn" id="btn-wrong">
+        <span class="btn-icon">✕</span>
+        <span class="btn-label">Wrong</span>
+      </button>
+      <button class="answer-btn correct-btn" id="btn-correct">
+        <span class="btn-icon">✓</span>
+        <span class="btn-label">Correct</span>
+      </button>
+    </div>
+
+    <!-- Flip hint — hidden after flip -->
+    <div class="flip-hint-bar" id="flip-hint-bar">
+      Click card or press <kbd>Space</kbd> to reveal
+    </div>
+
+    <!-- Keyboard shortcuts -->
+    <div class="kbd-hint">
+      <span><kbd>Space</kbd> flip</span>
+      <span><kbd>C</kbd> correct</span>
+      <span><kbd>W</kbd> wrong</span>
+    </div>
+
+  </main>
+
+  <!-- Completion overlay -->
+  <div class="completion hidden" id="completion">
+    <div class="completion-box">
+      <div class="completion-emoji">🎉</div>
+      <h2>Alle gelernt!</h2>
+      <p>You've mastered all <strong id="comp-total">0</strong> flashcards!</p>
+      <button class="restart-btn" id="btn-restart">Start Over</button>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
