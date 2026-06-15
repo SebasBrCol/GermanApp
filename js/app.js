@@ -52,6 +52,9 @@ function nextCard() {
   renderFront(allCards[currentIdx]);
   renderBack(allCards[currentIdx]);
   updateStreakDots(currentIdx);
+
+  // New: render the response area for typed answers
+  renderResponseArea(allCards[currentIdx]);
 }
 
 function renderFront(card) {
@@ -122,21 +125,127 @@ function updateStreakDots(idx) {
   });
 }
 
-// ── Flip ─────────────────────────────────────────────────────────
+// ── Helpers for typed response flow ─────────────────────────────────
 
+function normalize(s) {
+  return (s || '').trim().toLowerCase();
+}
+
+function renderResponseArea(card) {
+  const area = document.getElementById('response-area');
+  const input = document.getElementById('response-input');
+  const submit = document.getElementById('response-submit');
+  const conjGrid = document.getElementById('conj-grid');
+  const msg = document.getElementById('response-msg');
+
+  // reset
+  area.classList.remove('hidden');
+  conjGrid.classList.add('hidden');
+  conjGrid.innerHTML = '';
+  msg.textContent = '';
+  input.value = '';
+  input.disabled = false;
+  input.placeholder = card.type === 'verb' ? 'Type the infinitive (e.g. machen)' : 'Type the German answer';
+  input.focus();
+
+  // Set a simple phase marker on the DOM element
+  area.dataset.phase = 'single';
+
+  const handleSingle = () => {
+    const val = normalize(input.value);
+    const expected = normalize(card.infinitiv || card.german || '');
+    if (!val) return;
+    if (val === expected) {
+      if (card.type === 'verb') {
+        // Move to conjugation phase
+        area.dataset.phase = 'conj';
+        renderVerbConjGrid(card);
+        input.value = '';
+        input.disabled = true;
+        msg.textContent = 'Infinitive correct — now type the conjugations';
+      } else {
+        msg.textContent = 'Correct!';
+        streaks[currentIdx] = (streaks[currentIdx] || 0) + 1;
+        if (streaks[currentIdx] >= 10) retireCard(currentIdx);
+        updateProgress();
+        // small visual pause then next card
+        setTimeout(nextCard, 700);
+      }
+    } else {
+      msg.textContent = 'Incorrect — expected: ' + (card.infinitiv || card.german);
+      // treat as wrong
+      streaks[currentIdx] = 0;
+      updateProgress();
+      setTimeout(nextCard, 700);
+    }
+  };
+
+  submit.onclick = () => {
+    if (area.dataset.phase === 'single') handleSingle();
+    else handleConjSubmit(card);
+  };
+
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (area.dataset.phase === 'single') handleSingle();
+    }
+  };
+}
+
+function renderVerbConjGrid(card) {
+  const conjGrid = document.getElementById('conj-grid');
+  conjGrid.classList.remove('hidden');
+  const keys = ['ich', 'du', 'er', 'wir', 'ihr', 'sie'];
+  conjGrid.innerHTML = keys.map(k => `
+    <div class="conj-row">
+      <label>${k}</label>
+      <!-- removed revealing placeholder that showed the correct form -->
+      <input data-pron="${k}" class="conj-input" autocomplete="off" placeholder="">
+    </div>
+  `).join('');
+  // focus first conjugation input
+  const first = conjGrid.querySelector('.conj-input');
+  if (first) first.focus();
+}
+
+function handleConjSubmit(card) {
+  const conjGrid = document.getElementById('conj-grid');
+  const inputs = Array.from(conjGrid.querySelectorAll('.conj-input'));
+  const msg = document.getElementById('response-msg');
+  const wrong = [];
+  inputs.forEach(inp => {
+    const pron = inp.dataset.pron;
+    const given = normalize(inp.value);
+    const expected = normalize(card[pron] || '');
+    if (given !== expected) wrong.push({ pron, given, expected });
+  });
+
+  if (wrong.length === 0) {
+    msg.textContent = 'All conjugations correct!';
+    streaks[currentIdx] = (streaks[currentIdx] || 0) + 1;
+    if (streaks[currentIdx] >= 10) retireCard(currentIdx);
+    updateProgress();
+    setTimeout(nextCard, 700);
+  } else {
+    msg.textContent = 'Some conjugations are incorrect. Example: ' + wrong[0].pron + ' → expected "' + wrong[0].expected + '"';
+    // reset streak
+    streaks[currentIdx] = 0;
+    updateProgress();
+    setTimeout(nextCard, 900);
+  }
+}
+
+// Make clicking the scene focus the input instead of flipping
 function flipCard() {
-  if (isFlipped) return;
-  isFlipped = true;
-  document.getElementById('card').classList.add('flipped');
-  document.getElementById('answer-btns').classList.remove('hidden');
-  document.getElementById('flip-hint-bar').classList.add('hidden');
+  const input = document.getElementById('response-input');
+  if (input) input.focus();
 }
 
 // ── Answer ────────────────────────────────────────────────────────
 
 function answer(correct) {
-  if (!isFlipped) return;
-
+  //if (!isFlipped) return;   <-- removed
   if (correct) {
     streaks[currentIdx] = (streaks[currentIdx] || 0) + 1;
     if (streaks[currentIdx] >= 10) {
