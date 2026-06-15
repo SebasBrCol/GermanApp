@@ -455,6 +455,69 @@ kbd {
   opacity: 0.85;
 }
 
+/* ── Response Area ── */
+.response-area {
+  width: var(--card-w);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.response-area input[type="text"] {
+  width: 100%;
+  max-width: var(--card-w);
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.response-area button#response-submit {
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+#conj-grid {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.conj-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.conj-row label {
+  width: 60px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-transform: lowercase;
+}
+
+.conj-row .conj-input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+}
+
+/* Keep hidden class behavior */
+.response-area.hidden { display: none; }
+
 /* ── Responsive ── */
 
 /* Large phones / small tablets (≤ 600px) */
