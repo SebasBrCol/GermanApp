@@ -47,7 +47,6 @@ function nextCard() {
   cardEl.offsetHeight; // force reflow so the snap is immediate
   cardEl.style.transition = '';
   document.getElementById('answer-btns').classList.add('hidden');
-  document.getElementById('flip-hint-bar').classList.remove('hidden');
 
   renderFront(allCards[currentIdx]);
   renderBack(allCards[currentIdx]);
@@ -131,52 +130,68 @@ function normalize(s) {
   return (s || '').trim().toLowerCase();
 }
 
+function showContinueBtn(onContinue) {
+  const btn = document.getElementById('continue-btn');
+  btn.classList.remove('hidden');
+  btn.onclick = () => {
+    btn.classList.add('hidden');
+    onContinue();
+  };
+}
+
 function renderResponseArea(card) {
   const area = document.getElementById('response-area');
   const input = document.getElementById('response-input');
   const submit = document.getElementById('response-submit');
   const conjGrid = document.getElementById('conj-grid');
   const msg = document.getElementById('response-msg');
+  const continueBtn = document.getElementById('continue-btn');
 
-  // reset
   area.classList.remove('hidden');
   conjGrid.classList.add('hidden');
   conjGrid.innerHTML = '';
   msg.textContent = '';
+  msg.className = 'response-msg';
   input.value = '';
   input.disabled = false;
-  input.placeholder = card.type === 'verb' ? 'Type the infinitive (e.g. machen)' : 'Type the German answer';
+  submit.disabled = false;
+  continueBtn.classList.add('hidden');
+  input.placeholder = card.type === 'verb' ? 'Type the infinitive' : 'Type the German answer';
   input.focus();
 
-  // Set a simple phase marker on the DOM element
   area.dataset.phase = 'single';
 
   const handleSingle = () => {
     const val = normalize(input.value);
     const expected = normalize(card.infinitiv || card.german || '');
     if (!val) return;
+    input.disabled = true;
+    submit.disabled = true;
     if (val === expected) {
       if (card.type === 'verb') {
-        // Move to conjugation phase
-        area.dataset.phase = 'conj';
-        renderVerbConjGrid(card);
-        input.value = '';
-        input.disabled = true;
-        msg.textContent = 'Infinitive correct — now type the conjugations';
+        msg.textContent = 'Infinitive correct!';
+        msg.className = 'response-msg correct';
+        showContinueBtn(() => {
+          area.dataset.phase = 'conj';
+          submit.disabled = false;
+          msg.textContent = 'Now type the conjugations below';
+          msg.className = 'response-msg';
+          renderVerbConjGrid(card);
+        });
       } else {
         msg.textContent = 'Correct!';
+        msg.className = 'response-msg correct';
         streaks[currentIdx] = (streaks[currentIdx] || 0) + 1;
         if (streaks[currentIdx] >= 10) retireCard(currentIdx);
         updateProgress();
-        // small visual pause then next card
-        setTimeout(nextCard, 700);
+        showContinueBtn(nextCard);
       }
     } else {
-      msg.textContent = 'Incorrect — expected: ' + (card.infinitiv || card.german);
-      // treat as wrong
+      msg.innerHTML = 'Incorrect — correct answer: <strong>' + (card.infinitiv || card.german) + '</strong>';
+      msg.className = 'response-msg wrong';
       streaks[currentIdx] = 0;
       updateProgress();
-      setTimeout(nextCard, 700);
+      showContinueBtn(nextCard);
     }
   };
 
@@ -196,15 +211,13 @@ function renderResponseArea(card) {
 function renderVerbConjGrid(card) {
   const conjGrid = document.getElementById('conj-grid');
   conjGrid.classList.remove('hidden');
-  const keys = ['ich', 'du', 'er', 'wir', 'ihr', 'sie'];
+  const keys = ['ich', 'du', 'er/sie/es', 'wir', 'ihr', 'Sie/sie'];
   conjGrid.innerHTML = keys.map(k => `
-    <div class="conj-row">
+    <div class="conj-cell">
       <label>${k}</label>
-      <!-- removed revealing placeholder that showed the correct form -->
       <input data-pron="${k}" class="conj-input" autocomplete="off" placeholder="">
     </div>
   `).join('');
-  // focus first conjugation input
   const first = conjGrid.querySelector('.conj-input');
   if (first) first.focus();
 }
@@ -213,33 +226,39 @@ function handleConjSubmit(card) {
   const conjGrid = document.getElementById('conj-grid');
   const inputs = Array.from(conjGrid.querySelectorAll('.conj-input'));
   const msg = document.getElementById('response-msg');
+  const submit = document.getElementById('response-submit');
   const wrong = [];
+
   inputs.forEach(inp => {
     const pron = inp.dataset.pron;
     const given = normalize(inp.value);
     const expected = normalize(card[pron] || '');
-    if (given !== expected) wrong.push({ pron, given, expected });
+    if (given !== expected) {
+      wrong.push({ pron, given, expected });
+      inp.classList.add('wrong');
+    } else {
+      inp.classList.add('correct');
+    }
+    inp.disabled = true;
   });
+
+  submit.disabled = true;
 
   if (wrong.length === 0) {
     msg.textContent = 'All conjugations correct!';
+    msg.className = 'response-msg correct';
     streaks[currentIdx] = (streaks[currentIdx] || 0) + 1;
     if (streaks[currentIdx] >= 10) retireCard(currentIdx);
     updateProgress();
-    setTimeout(nextCard, 700);
   } else {
-    msg.textContent = 'Some conjugations are incorrect. Example: ' + wrong[0].pron + ' → expected "' + wrong[0].expected + '"';
-    // reset streak
+    const corrections = wrong.map(w => `${w.pron} → ${w.expected}`).join(', ');
+    msg.innerHTML = 'Some incorrect — correct: <strong>' + corrections + '</strong>';
+    msg.className = 'response-msg wrong';
     streaks[currentIdx] = 0;
     updateProgress();
-    setTimeout(nextCard, 900);
   }
-}
 
-// Make clicking the scene focus the input instead of flipping
-function flipCard() {
-  const input = document.getElementById('response-input');
-  if (input) input.focus();
+  showContinueBtn(nextCard);
 }
 
 // ── Answer ────────────────────────────────────────────────────────
@@ -308,15 +327,8 @@ function subtypeLabel(subtype) {
 
 // ── Events ────────────────────────────────────────────────────────
 
-document.getElementById('card-scene').addEventListener('click', flipCard);
 document.getElementById('btn-correct').addEventListener('click', e => { e.stopPropagation(); answer(true); });
 document.getElementById('btn-wrong').addEventListener('click',   e => { e.stopPropagation(); answer(false); });
 document.getElementById('btn-restart').addEventListener('click', restart);
-
-document.addEventListener('keydown', e => {
-  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipCard(); }
-  if (e.key === 'c' || e.key === 'C') answer(true);
-  if (e.key === 'w' || e.key === 'W') answer(false);
-});
 
 loadData();
