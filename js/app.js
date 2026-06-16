@@ -139,44 +139,76 @@ function showContinueBtn(onContinue) {
   };
 }
 
+function resetSingleInput() {
+  const input = document.getElementById('response-input');
+  const submit = document.getElementById('response-submit');
+  const msg = document.getElementById('response-msg');
+  input.value = '';
+  input.disabled = false;
+  input.className = '';
+  submit.disabled = false;
+  msg.textContent = '';
+  msg.className = 'response-msg';
+  document.getElementById('continue-btn').classList.add('hidden');
+  const cg = document.getElementById('conj-grid');
+  cg.classList.add('hidden');
+  cg.innerHTML = '';
+  cg.style.gridTemplateColumns = '';
+  document.getElementById('conj-legend').classList.add('hidden');
+}
+
 function renderResponseArea(card) {
   const area = document.getElementById('response-area');
   const input = document.getElementById('response-input');
   const submit = document.getElementById('response-submit');
-  const conjGrid = document.getElementById('conj-grid');
-  const msg = document.getElementById('response-msg');
-  const continueBtn = document.getElementById('continue-btn');
 
   area.classList.remove('hidden');
-  conjGrid.classList.add('hidden');
-  conjGrid.innerHTML = '';
-  msg.textContent = '';
-  msg.className = 'response-msg';
-  input.value = '';
-  input.disabled = false;
-  submit.disabled = false;
-  continueBtn.classList.add('hidden');
-  input.placeholder = card.type === 'verb' ? 'Type the infinitive' : 'Type the German answer';
+  resetSingleInput();
+
+  if (card.type === 'verb') {
+    input.placeholder = 'Type the infinitive (e.g. machen)';
+  } else if (card.type === 'pronoun') {
+    input.placeholder = 'Type the Nominativ (e.g. ich)';
+  } else {
+    input.placeholder = 'Type the German answer';
+  }
   input.focus();
 
   area.dataset.phase = 'single';
 
   const handleSingle = () => {
     const val = normalize(input.value);
-    const expected = normalize(card.infinitiv || card.german || '');
+    const expected = normalize(card.type === 'verb' ? card.infinitiv : card.type === 'pronoun' ? card.nominativ : card.german);
     if (!val) return;
     input.disabled = true;
     submit.disabled = true;
-    if (val === expected) {
+
+    const correct = val === expected;
+    input.classList.add(correct ? 'input-correct' : 'input-wrong');
+    if (!correct) input.value = card.type === 'verb' ? card.infinitiv : card.type === 'pronoun' ? card.nominativ : card.german;
+
+    const msg = document.getElementById('response-msg');
+
+    if (correct) {
       if (card.type === 'verb') {
         msg.textContent = 'Infinitive correct!';
         msg.className = 'response-msg correct';
         showContinueBtn(() => {
+          resetSingleInput();
           area.dataset.phase = 'conj';
           submit.disabled = false;
-          msg.textContent = 'Now type the conjugations below';
-          msg.className = 'response-msg';
+          document.getElementById('response-msg').textContent = 'Now type the conjugations below';
           renderVerbConjGrid(card);
+        });
+      } else if (card.type === 'pronoun') {
+        msg.textContent = 'Nominativ correct!';
+        msg.className = 'response-msg correct';
+        showContinueBtn(() => {
+          resetSingleInput();
+          area.dataset.phase = 'conj';
+          submit.disabled = false;
+          document.getElementById('response-msg').textContent = 'Now type the Akkusativ and Dativ below';
+          renderPronounConjGrid(card);
         });
       } else {
         msg.textContent = 'Correct!';
@@ -187,7 +219,7 @@ function renderResponseArea(card) {
         showContinueBtn(nextCard);
       }
     } else {
-      msg.innerHTML = 'Incorrect — correct answer: <strong>' + (card.infinitiv || card.german) + '</strong>';
+      msg.textContent = 'Incorrect — see correct answer above';
       msg.className = 'response-msg wrong';
       streaks[currentIdx] = 0;
       updateProgress();
@@ -211,15 +243,38 @@ function renderResponseArea(card) {
 function renderVerbConjGrid(card) {
   const conjGrid = document.getElementById('conj-grid');
   conjGrid.classList.remove('hidden');
-  const keys = ['ich', 'du', 'er/sie/es', 'wir', 'ihr', 'Sie/sie'];
-  conjGrid.innerHTML = keys.map(k => `
+  const entries = [
+    { label: 'ich',     key: 'ich' },
+    { label: 'du',      key: 'du' },
+    { label: 'er/sie/es', key: 'er' },
+    { label: 'wir',     key: 'wir' },
+    { label: 'ihr',     key: 'ihr' },
+    { label: 'sie/Sie', key: 'sie' },
+  ];
+  conjGrid.innerHTML = entries.map(e => `
     <div class="conj-cell">
-      <label>${k}</label>
-      <input data-pron="${k}" class="conj-input" autocomplete="off" placeholder="">
+      <label>${e.label}</label>
+      <input data-key="${e.key}" class="conj-input" autocomplete="off" placeholder="">
     </div>
   `).join('');
-  const first = conjGrid.querySelector('.conj-input');
-  if (first) first.focus();
+  conjGrid.querySelector('.conj-input').focus();
+}
+
+function renderPronounConjGrid(card) {
+  const conjGrid = document.getElementById('conj-grid');
+  conjGrid.classList.remove('hidden');
+  conjGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+  const entries = [
+    { label: 'Akkusativ', key: 'akkusativ' },
+    { label: 'Dativ',     key: 'dativ' },
+  ];
+  conjGrid.innerHTML = entries.map(e => `
+    <div class="conj-cell">
+      <label>${e.label}</label>
+      <input data-key="${e.key}" class="conj-input" autocomplete="off" placeholder="">
+    </div>
+  `).join('');
+  conjGrid.querySelector('.conj-input').focus();
 }
 
 function handleConjSubmit(card) {
@@ -227,15 +282,18 @@ function handleConjSubmit(card) {
   const inputs = Array.from(conjGrid.querySelectorAll('.conj-input'));
   const msg = document.getElementById('response-msg');
   const submit = document.getElementById('response-submit');
-  const wrong = [];
+  const legend = document.getElementById('conj-legend');
+  let anyWrong = false;
 
   inputs.forEach(inp => {
-    const pron = inp.dataset.pron;
+    const key = inp.dataset.key;
     const given = normalize(inp.value);
-    const expected = normalize(card[pron] || '');
-    if (given !== expected) {
-      wrong.push({ pron, given, expected });
+    const expected = card[key] || '';
+    const isCorrect = given === normalize(expected);
+    if (!isCorrect) {
+      anyWrong = true;
       inp.classList.add('wrong');
+      inp.value = expected;
     } else {
       inp.classList.add('correct');
     }
@@ -243,16 +301,16 @@ function handleConjSubmit(card) {
   });
 
   submit.disabled = true;
+  legend.classList.remove('hidden');
 
-  if (wrong.length === 0) {
-    msg.textContent = 'All conjugations correct!';
+  if (!anyWrong) {
+    msg.textContent = 'All correct!';
     msg.className = 'response-msg correct';
     streaks[currentIdx] = (streaks[currentIdx] || 0) + 1;
     if (streaks[currentIdx] >= 10) retireCard(currentIdx);
     updateProgress();
   } else {
-    const corrections = wrong.map(w => `${w.pron} → ${w.expected}`).join(', ');
-    msg.innerHTML = 'Some incorrect — correct: <strong>' + corrections + '</strong>';
+    msg.textContent = 'Some incorrect — see corrected answers above';
     msg.className = 'response-msg wrong';
     streaks[currentIdx] = 0;
     updateProgress();
